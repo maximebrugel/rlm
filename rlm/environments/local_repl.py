@@ -1,6 +1,7 @@
 from rlm.environments.base_env import NonIsolatedEnv, REPLResult
+from rlm.core.comms_utils import send_lm_request, LMRequest
 
-from typing import Optional, Any
+from typing import Optional, Any, Tuple
 from contextlib import contextmanager
 import tempfile
 import threading
@@ -12,6 +13,10 @@ import sys
 import os
 import io
 
+
+# =============================================================================
+# Safe Builtins
+# =============================================================================
 
 # Safe builtins - blocks dangerous operations like eval/exec/input
 _SAFE_BUILTINS = {
@@ -114,12 +119,14 @@ class LocalREPL(NonIsolatedEnv):
 
     def __init__(
         self,
+        lm_handler_address: Optional[Tuple[str, int]] = None,
         context_payload: Optional[dict | list | str] = None,
         setup_code: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
 
+        self.lm_handler_address = lm_handler_address
         self.original_cwd = os.getcwd()
         self.temp_dir = tempfile.mkdtemp(prefix=f"repl_env_{uuid.uuid4()}_")
         self._lock = threading.Lock()
@@ -133,6 +140,7 @@ class LocalREPL(NonIsolatedEnv):
 
         # Add helper functions
         self.globals["FINAL_VAR"] = self._final_var
+        self.globals["llm_query"] = self._llm_query
 
         # Load context if provided
         if context_payload is not None:
@@ -148,6 +156,26 @@ class LocalREPL(NonIsolatedEnv):
         if variable_name in self.locals:
             return str(self.locals[variable_name])
         return f"Error: Variable '{variable_name}' not found"
+
+    def _llm_query(self, prompt: str, model: Optional[str] = None) -> str:
+        """Query the LM via socket connection to the handler.
+
+        Args:
+            prompt: The prompt to send to the LM.
+            model: Optional model name to use (if handler has multiple clients).
+        """
+        if not self.lm_handler_address:
+            return "Error: No LM handler configured"
+
+        try:
+            request = LMRequest(prompt=prompt, model=model)
+            response = send_lm_request(self.lm_handler_address, request)
+
+            if not response.success:
+                return f"Error: {response.error}"
+            return response.content or ""
+        except Exception as e:
+            return f"Error: LM query failed - {e}"
 
     def _load_context(self, context_payload: dict | list | str):
         """Load context into the environment."""
@@ -188,11 +216,7 @@ class LocalREPL(NonIsolatedEnv):
         finally:
             os.chdir(old_cwd)
 
-    def setup(self):
-        """TODO: Move setup to here."""
-        pass
-
-    async def execute_code(self, code: str) -> REPLResult:
+    def execute_code(self, code: str) -> REPLResult:
         """Execute code in the persistent namespace and return result."""
         start_time = time.perf_counter()
 

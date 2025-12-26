@@ -1,25 +1,6 @@
+from rlm.core.types import REPLResult
+
 from abc import ABC, abstractmethod
-from typing import Any
-from dataclasses import dataclass
-
-
-@dataclass
-class REPLResult:
-    stdout: str
-    stderr: str
-    locals: dict
-    execution_time: float
-
-    def __init__(
-        self, stdout: str, stderr: str, locals: dict, execution_time: float = None
-    ):
-        self.stdout = stdout
-        self.stderr = stderr
-        self.locals = locals
-        self.execution_time = execution_time
-
-    def __str__(self):
-        return f"REPLResult(stdout={self.stdout}, stderr={self.stderr}, locals={self.locals}, execution_time={self.execution_time})"
 
 
 class BaseEnv(ABC):
@@ -30,10 +11,6 @@ class BaseEnv(ABC):
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
-
-    @abstractmethod
-    def setup(self, action: Any) -> Any:
-        raise NotImplementedError
 
     @abstractmethod
     async def execute_code(self, code: str) -> REPLResult:
@@ -50,11 +27,7 @@ class IsolatedEnv(BaseEnv, ABC):
         super().__init__(**kwargs)
 
     @abstractmethod
-    def setup(self, action: Any) -> Any:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def execute_code(self, code: str) -> REPLResult:
+    def execute_code(self, code: str) -> REPLResult:
         raise NotImplementedError
 
 
@@ -69,9 +42,5 @@ class NonIsolatedEnv(BaseEnv, ABC):
         super().__init__(**kwargs)
 
     @abstractmethod
-    def setup(self, action: Any) -> Any:
-        raise NotImplementedError
-
-    @abstractmethod
-    async def execute_code(self, code: str) -> REPLResult:
+    def execute_code(self, code: str) -> REPLResult:
         raise NotImplementedError

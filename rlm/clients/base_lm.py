@@ -1,6 +1,16 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 
+from dataclasses import dataclass
+
+
+@dataclass
+class CostSummary:
+    total_calls: int
+    total_cost: float
+    total_input_tokens: int
+    total_output_tokens: int
+
 
 class BaseLM(ABC):
     """
@@ -18,4 +28,9 @@ class BaseLM(ABC):
 
     @abstractmethod
     async def acompletion(self, prompt: str | Dict[str, Any]) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_cost_summary(self) -> CostSummary:
+        """Get cost summary for all calls."""
         raise NotImplementedError
