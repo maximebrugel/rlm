@@ -180,7 +180,19 @@ class RLM:
                 )
 
                 # Check if RLM is done and has a final answer.
-                final_answer = find_final_answer(iteration.response)
+                final_answer_match = find_final_answer(iteration.response)
+                final_answer: str | None = None
+                if final_answer_match is not None:
+                    answer_type, content = final_answer_match
+                    if answer_type == "FINAL":
+                        final_answer = content
+                    elif answer_type == "FINAL_VAR":
+                        variable_name = content.strip().strip('"').strip("'")
+                        result = environment.execute_code(f"print(FINAL_VAR({variable_name!r}))")
+                        final_answer = result.stdout.strip()
+                        if final_answer == "":
+                            final_answer = result.stderr.strip() or ""
+
                 iteration.final_answer = final_answer
 
                 # If logger is used, log the iteration.
@@ -190,7 +202,7 @@ class RLM:
                 # Verbose output for this iteration
                 self.verbose.print_iteration(iteration, i + 1)
 
-                if final_answer:
+                if final_answer is not None:
                     time_end = time.perf_counter()
                     usage = lm_handler.get_usage_summary()
                     self.verbose.print_final_answer(final_answer)
